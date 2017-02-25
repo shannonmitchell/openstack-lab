@@ -87,16 +87,31 @@ else
 fi
 
 # Set up the logical volume if needed
-lvck $LVNAME > /dev/null 2>&1
+lvdisplay ${VGNAME}/${LVNAME} > /dev/null 2>&1
 if [ $? == 0 ]
 then
   loginfo "Logical volume $LVNAME already exists"
 else
-  logaction "lvcreate $VGNAME --name $LVNAME -l +100%FREE"
-  lvcreate $VGNAME --name $LVNAME -l +100%FREE > /dev/null 2>&1
+  logaction "lvcreate -y $VGNAME --name $LVNAME -l +100%FREE"
+  lvcreate -y $VGNAME --name $LVNAME -l +100%FREE > /dev/null 2>&1
   if [ $? != 0 ]
   then
-    logerr "lvcreate $VGNAME --name $LVNAME -l +100%FREE failed"
+    logerr "lvcreate -y $VGNAME --name $LVNAME -l +100%FREE failed"
+    exit 1
+  fi
+fi
+
+# Create a filesystem for it
+blkid /dev/mapper/${VGNAME}-${LVNAME} >/dev/nul 2>&1
+if [ $? == 0 ]
+then
+  loginfo "/dev/mapper/${VGNAME}-${LVNAME} already has a filesystem on it"
+else
+  logaction "mkfs.ext4 /dev/mapper/${VGNAME}-${LVNAME}"
+  mkfs.ext4 /dev/mapper/${VGNAME}-${LVNAME} > /dev/null 2>&1
+  if [ $? != 0 ]
+  then
+    logerr "mkfs.ext4 /dev/mapper/${VGNAME}-${LVNAME} failed"
     exit 1
   fi
 fi
