@@ -123,8 +123,8 @@ if [ $? == 0 ]
 then
   loginfo "/dev/mapper/${VGNAME}-${LVNAME} is already in the fstab file"
 else
-  logaction "echo \"/dev/mapper/${VGNAME}-${LVNAME}	/var/lib/libvirt/	ext4	defaults 0 0\" >> /etc/fstab"
-  echo "/dev/mapper/${VGNAME}-${LVNAME}     /var/lib/libvirt/	ext4	defaults 0 0" >> /etc/fstab
+  logaction "echo \"/dev/mapper/${VGNAME}-${LVNAME}	/var/lib/libvirt/images	ext4	defaults 0 0\" >> /etc/fstab"
+  echo "/dev/mapper/${VGNAME}-${LVNAME}     /var/lib/libvirt/images	ext4	defaults 0 0" >> /etc/fstab
   grep "/dev/mapper/${VGNAME}-${LVNAME}" /etc/fstab > /dev/null 2>&1
   if [ $? != 0 ]
   then
@@ -135,16 +135,16 @@ fi
 
 
 # Mount /var/lib/libvirt
-mount | grep  "/var/lib/libvirt" > /dev/null 2>&1
+mount | grep  "/var/lib/libvirt/images" > /dev/null 2>&1
 if [ $? == 0 ]
 then
-  loginfo "/dev/mapper/${VGNAME}-${LVNAME} is already mounted to /var/lib/libvirt"
+  loginfo "/dev/mapper/${VGNAME}-${LVNAME} is already mounted to /var/lib/libvirt/images"
 else
-  logaction "mount /var/lib/libvirt"
-  mount /var/lib/libvirt
+  logaction "mount /var/lib/libvirt/images"
+  mount /var/lib/libvirt/images
   if [ $? != 0 ]
   then
-    logerr "Mounting /var/lib/libvirt failed"
+    logerr "Mounting /var/lib/libvirt/images failed"
     exit 1
   fi
 fi

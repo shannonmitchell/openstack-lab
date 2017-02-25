@@ -2,11 +2,12 @@
 
 import os
 import sys
+import libvirt
 import argparse
 import subprocess
 import configparser
 
-# apt-get install python-configparsesr python-lvm2
+# apt-get install python-configparsesr python-lvm2 python-libvirt
 
 def logit(log, logtype="INFO"):
     print "[%s]: %s" % (logtype, log)
@@ -38,6 +39,30 @@ def runScript(script, script_args=''):
     else:
        logit("%s does not exist" % script, logtype="ERROR");
 
+def libvirtConnect():
+    conn = libvirt.open('qemu:///system')
+    if conn == None:
+        logit("Failed to open connection to the qemu:///system", logtype="ERROR")
+        sys.exit(1)
+
+    return conn
+
+def configureNetworks(curconfig):
+    conn = libvirtConnect()   
+
+    # Remove the default network if it exists
+    networks = conn.listNetworks()
+    for network in networks:
+        if network == 'default':
+            netobj = conn.networkLookupByName('default')
+            netobj.destroy()
+            netobj.undefine()
+
+    # Create a management network with external access
+
+
+
+
 
 def create_func(curconfig):
 
@@ -57,6 +82,16 @@ def create_func(curconfig):
     ################################
     image_disk = getConfigItem(curconfig, 'lab-host', 'lab-disk')
     runScript("%s/create_image_disk.sh" % scripts_dir, image_disk)
+
+    ###################
+    # Set up Networing
+    ###################
+    configureNetworks(curconfig)
+
+
+    
+
+    
 
 
 

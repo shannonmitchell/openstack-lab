@@ -23,17 +23,17 @@ VGNAME="labvg00"
 LVNAME="lablv00"
 
 
-# UnMount /var/lib/libvirt
-mount | grep  "/var/lib/libvirt" > /dev/null 2>&1
+# UnMount /var/lib/libvirt/images
+mount | grep  "/var/lib/libvirt/images" > /dev/null 2>&1
 if [ $? != 0 ]
 then
-  loginfo "/dev/mapper/${VGNAME}-${LVNAME} is already unmounted from /var/lib/libvirt"
+  loginfo "/dev/mapper/${VGNAME}-${LVNAME} is already unmounted from /var/lib/libvirt/images"
 else
-  logaction "umount /var/lib/libvirt"
-  umount /var/lib/libvirt
+  logaction "umount /var/lib/libvirt/images"
+  umount /var/lib/libvirt/images
   if [ $? != 0 ]
   then
-    logerr "UnMounting /var/lib/libvirt failed"
+    logerr "UnMounting /var/lib/libvirt/images failed"
     exit 1
   fi
 fi
@@ -44,12 +44,12 @@ if [ $? != 0 ]
 then
   loginfo "/dev/mapper/${VGNAME}-${LVNAME} is already removed from the fstab file"
 else
-  logaction "sed -i.bak	'/\/var\/lib\/libvirt/d' /etc/fstab"
-  sed -i.bak '/\/var\/lib\/libvirt/d' /etc/fstab > /dev/null 2>&1
+  logaction "sed -i.bak	'/\/var\/lib\/libvirt\/images/d' /etc/fstab"
+  sed -i.bak '/\/var\/lib\/libvirt\/images/d' /etc/fstab > /dev/null 2>&1
   grep "/dev/mapper/${VGNAME}-${LVNAME}" /etc/fstab > /dev/null 2>&1
   if [ $? == 0 ]
   then
-    logerr "Removing the /var/lib/libvirt line from fstab failed"
+    logerr "Removing the /var/lib/libvirt/images line from fstab failed"
     exit 1
   fi
 fi
