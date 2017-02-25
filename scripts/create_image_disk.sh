@@ -115,3 +115,37 @@ else
     exit 1
   fi
 fi
+
+
+# Add the mount point to the /etc/fstab file
+grep "/dev/mapper/${VGNAME}-${LVNAME}" /etc/fstab > /dev/null 2>&1
+if [ $? == 0 ]
+then
+  loginfo "/dev/mapper/${VGNAME}-${LVNAME} is already in the fstab file"
+else
+  logaction "echo \"/dev/mapper/${VGNAME}-${LVNAME}	/var/lib/libvirt/	ext4	defaults 0 0\" >> /etc/fstab"
+  echo "/dev/mapper/${VGNAME}-${LVNAME}     /var/lib/libvirt/	ext4	defaults 0 0" >> /etc/fstab
+  grep "/dev/mapper/${VGNAME}-${LVNAME}" /etc/fstab > /dev/null 2>&1
+  if [ $? != 0 ]
+  then
+    logerr "Updating fstab for libvirt mount failed"
+    exit 1
+  fi
+fi
+
+
+# Mount /var/lib/libvirt
+mount | grep  "/var/lib/libvirt" > /dev/null 2>&1
+if [ $? == 0 ]
+then
+  loginfo "/dev/mapper/${VGNAME}-${LVNAME} is already mounted to /var/lib/libvirt"
+else
+  logaction "mount /var/lib/libvirt"
+  mount /var/lib/libvirt
+  if [ $? != 0 ]
+  then
+    logerr "Mounting /var/lib/libvirt failed"
+    exit 1
+  fi
+fi
+

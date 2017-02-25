@@ -56,12 +56,22 @@ def create_func(curconfig):
     # Run script to set up storage
     ################################
     image_disk = getConfigItem(curconfig, 'lab-host', 'lab-disk')
-    runScript("%s/prep_image_disk.sh" % scripts_dir, image_disk)
+    runScript("%s/create_image_disk.sh" % scripts_dir, image_disk)
 
 
 
 def destroy_func(curconfig):
-  print ""
+
+    ########################################
+    # Pull some variables out of the config
+    ########################################
+    scripts_dir = getConfigItem(curconfig, 'default', 'scripts-dir')
+
+    ################################
+    # Run script to destroy storage
+    ################################
+    image_disk = getConfigItem(curconfig, 'lab-host', 'lab-disk')
+    runScript("%s/destroy_image_disk.sh" % scripts_dir, image_disk)
 
 
 def main():
