@@ -1,0 +1,14 @@
+
+# Function logit
+function logaction {
+  echo "[ACTION]: ${1}"
+}
+function logsuccess {
+  echo "[SUCCESS]: ${1}"
+}
+function logerr {
+  echo "[ERROR]: ${1}"
+}
+function loginfo {
+  echo "[INFO]: ${1}"
+}
