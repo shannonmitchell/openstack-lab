@@ -172,57 +172,69 @@ def destroyNetworks():
             netobj.undefine()
 
 
+########################
+# Create the deploy box
+########################
+def createDeployVM(curconfig):
+
+    # Download the install iso
+#    isofile = "/root/install-image.iso"
+#    isourl = getConfigItem(curconfig, 'deploy', 'install_iso_url')
+#    if not os.path.isfile(isofile):
+#        logit("Running wget %s -O %s" % (isourl, isofile))
+#        try:
+#            devnull = open(os.devnull, 'wb')
+#            subprocess.check_call("wget %s -O %s" % (isourl, isofile), shell=True, stderr=devnull, stdout=devnull)
+#            devnull.close()
+#        except subprocess.CalledProcessError:
+#            logit("Command 'wget %s -O %s' errored out. Exiting program" % (isourl, isofile), logtype="ERROR")
+#            sys.exit(1)
+#        else:
+#            logit("Command 'wget %s -O %s' completed without issue." % (isourl, isofile), logtype="SUCCESS")
+#    else:
+#       logit("%s exists already" % isofile, logtype="INFO");
 
 
 
-
-
+################################
+# Create the lab environment
+################################
 def create_func(curconfig):
 
-    ########################################
     # Pull some variables out of the config
-    ########################################
     scripts_dir = getConfigItem(curconfig, 'default', 'scripts-dir')
 
-    ###########################################
     # Run script to prepar host for kvm usage
-    ###########################################
     runScript("%s/install_virtual_tools.sh" % scripts_dir)
 
 
-    ################################
     # Run script to set up storage
-    ################################
     image_disk = getConfigItem(curconfig, 'lab-host', 'lab-disk')
     runScript("%s/create_image_disk.sh" % scripts_dir, image_disk)
 
-    ###################
     # Set up Networing
-    ###################
     configureNetworks(curconfig)
 
+    # Create the deploy device
+    createDeployVM(curconfig)
+
 
     
 
     
 
-
-
+###############################
+# Destroy the lab environment
+###############################
 def destroy_func(curconfig):
 
-    ###################
     # Clean Networking
-    ###################
     destroyNetworks()
 
-    ########################################
     # Pull some variables out of the config
-    ########################################
     scripts_dir = getConfigItem(curconfig, 'default', 'scripts-dir')
 
-    ################################
     # Run script to destroy storage
-    ################################
     image_disk = getConfigItem(curconfig, 'lab-host', 'lab-disk')
     runScript("%s/destroy_image_disk.sh" % scripts_dir, image_disk)
 

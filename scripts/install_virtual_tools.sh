@@ -19,7 +19,7 @@ then
 fi
 
 # Install packages only if needed
-for PACKAGE in qemu-kvm libvirt-bin
+for PACKAGE in qemu-kvm libvirt-bin virtinst virt-viewer qemu-utils libosinfo-bin
 do
   loginfo "Checking if $PACKAGE is installed"
   dpkg -s $PACKAGE > /dev/null 2>&1
@@ -29,7 +29,7 @@ do
     apt-get install -y $PACKAGE > /dev/null 2>&1
     if [ $? != 0 ]
     then
-      logerro "Failed to install package ${PACKAGE}"
+      logerr "Failed to install package ${PACKAGE}"
     else
       logsuccess "Installed package ${PACKAGE}"
     fi
