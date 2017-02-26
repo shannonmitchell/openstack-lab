@@ -13,7 +13,7 @@ virt-install \
 --network network=management,model=virtio \
 --location=http://us.archive.ubuntu.com/ubuntu/dists/xenial/main/installer-amd64/ \
 --initrd-inject=./files/preseed.cfg \
---extra-args="console=tty0 console=ttyS0,115200n8 serial ip=10.10.0.3:10.10.10.1:255.255.0.0:deploy.localhost:none locale=en_GB.UTF-8 console-setup/ask_detect=false keyboard-configuration/layoutcode=hu file=file:/preseed.cfg quiet" \
+--extra-args="console=tty0 console=ttyS0,115200n8 serial locale=en_GB.UTF-8 console-setup/ask_detect=false keyboard-configuration/layoutcode=hu file=file:/preseed.cfg quiet" \
 --os-type=linux \
 --os-variant=ubuntu16.04 \
 --virt-type kvm \
@@ -21,3 +21,4 @@ virt-install \
 --noreboot
 
 #--video=vga \
+#--extra-args="console=tty0 console=ttyS0,115200n8 serial ip=10.10.0.3:10.10.10.1:255.255.0.0:deploy.localhost:none locale=en_GB.UTF-8 console-setup/ask_detect=false keyboard-configuration/layoutcode=hu file=file:/preseed.cfg quiet" \
