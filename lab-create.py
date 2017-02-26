@@ -2,6 +2,7 @@
 
 import os
 import sys
+import uuid
 import libvirt
 import argparse
 import subprocess
@@ -50,6 +51,10 @@ def libvirtConnect():
 def configureNetworks(curconfig):
     conn = libvirtConnect()   
 
+    found_storage = 0
+    found_overlay = 0
+    found_management = 0
+
     # Remove the default network if it exists
     networks = conn.listNetworks()
     for network in networks:
@@ -57,8 +62,116 @@ def configureNetworks(curconfig):
             netobj = conn.networkLookupByName('default')
             netobj.destroy()
             netobj.undefine()
+        if network == 'storage':
+            found_storage = 1;
+        if network == 'management':
+            found_management = 1;
+        if network == 'overlay':
+            found_overlay = 1;
 
     # Create a management network with external access
+    management_gw = getConfigItem(curconfig, 'networks', 'management_gw')
+    management_netmask = getConfigItem(curconfig, 'networks', 'management_netmask')
+    if found_management == 0:
+        logit("Creating management network", logtype="ACTION")
+        management_net_xml = """<network>
+  <name>management</name>
+  <uuid>%s</uuid>
+  <forward mode='nat'/>
+  <bridge name='virbr0' stp='on' delay='0'/>
+  <ip address='%s' netmask='%s'>
+  </ip>
+</network> """ % (uuid.uuid4(), management_gw, management_netmask)
+
+        # Define it in libvirt
+        netobj = conn.networkDefineXML(management_net_xml)
+        if netobj == None:
+            logit("Failed to create management network", logtype="ERROR")
+            sys.exit(1)
+
+        # Set it to autostart
+        netobj.setAutostart(1)
+        
+        # Make it active
+        isactive = netobj.isActive()
+        if isactive == 1:
+            logit("Network management is up and active", logtype="SUCCESS")
+        else:
+            netobj.create()
+
+    # Create a overlay network
+    overlay_gw = getConfigItem(curconfig, 'networks', 'overlay_gw')
+    overlay_netmask = getConfigItem(curconfig, 'networks', 'overlay_netmask')
+    if found_overlay == 0:
+        logit("Creating overlay network", logtype="ACTION")
+        overlay_net_xml = """<network>
+  <name>overlay</name>
+  <uuid>%s</uuid>
+  <bridge name='virbr1' stp='on' delay='0'/>
+  <ip address='%s' netmask='%s'>
+  </ip>
+</network> """ % (uuid.uuid4(), overlay_gw, overlay_netmask)
+
+        # Define it in libvirt
+        netobj = conn.networkDefineXML(overlay_net_xml)
+        if netobj == None:
+            logit("Failed to create overlay network", logtype="ERROR")
+            sys.exit(1)
+
+        # Set it to autostart
+        netobj.setAutostart(1)
+        
+        # Make it active
+        isactive = netobj.isActive()
+        if isactive == 1:
+            logit("Network overlay is up and active", logtype="SUCCESS")
+        else:
+            netobj.create()
+
+    # Create a storage network
+    storage_gw = getConfigItem(curconfig, 'networks', 'storage_gw')
+    storage_netmask = getConfigItem(curconfig, 'networks', 'storage_netmask')
+    if found_storage == 0:
+        logit("Creating storage network", logtype="ACTION")
+        storage_net_xml = """<network>
+  <name>storage</name>
+  <uuid>%s</uuid>
+  <bridge name='virbr2' stp='on' delay='0'/>
+  <ip address='%s' netmask='%s'>
+  </ip>
+</network> """ % (uuid.uuid4(), storage_gw, storage_netmask)
+
+        # Define it in libvirt
+        netobj = conn.networkDefineXML(storage_net_xml)
+        if netobj == None:
+            logit("Failed to create storage network", logtype="ERROR")
+            sys.exit(1)
+
+        # Set it to autostart
+        netobj.setAutostart(1)
+        
+        # Make it active
+        isactive = netobj.isActive()
+        if isactive == 1:
+            logit("Network storage is up and active", logtype="SUCCESS")
+        else:
+            netobj.create()
+
+
+def destroyNetworks():
+
+    conn = libvirtConnect()   
+
+    # Remove the default network if it exists
+    networks = conn.listNetworks()
+    for network in networks:
+        if network in ['default', 'storage', 'management', 'overlay']:
+            logit("Deleting %s network" % network, logtype="ACTION")
+            netobj = conn.networkLookupByName(network)
+            netobj.destroy()
+            netobj.undefine()
+
+
 
 
 
@@ -97,6 +210,11 @@ def create_func(curconfig):
 
 def destroy_func(curconfig):
 
+    ###################
+    # Clean Networking
+    ###################
+    destroyNetworks()
+
     ########################################
     # Pull some variables out of the config
     ########################################
@@ -125,7 +243,6 @@ def main():
 
     args = parser.parse_args()
 
-    #print args  
 
     #############################
     # Get the configuration 
