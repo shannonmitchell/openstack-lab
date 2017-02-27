@@ -177,22 +177,74 @@ def destroyNetworks():
 ########################
 def createDeployVM(curconfig):
 
-    # Download the install iso
-#    isofile = "/root/install-image.iso"
-#    isourl = getConfigItem(curconfig, 'deploy', 'install_iso_url')
-#    if not os.path.isfile(isofile):
-#        logit("Running wget %s -O %s" % (isourl, isofile))
-#        try:
-#            devnull = open(os.devnull, 'wb')
-#            subprocess.check_call("wget %s -O %s" % (isourl, isofile), shell=True, stderr=devnull, stdout=devnull)
-#            devnull.close()
-#        except subprocess.CalledProcessError:
-#            logit("Command 'wget %s -O %s' errored out. Exiting program" % (isourl, isofile), logtype="ERROR")
-#            sys.exit(1)
-#        else:
-#            logit("Command 'wget %s -O %s' completed without issue." % (isourl, isofile), logtype="SUCCESS")
-#    else:
-#       logit("%s exists already" % isofile, logtype="INFO");
+    # Check if deploy device exists
+    conn = libvirtConnect()   
+
+    # Just log and return if it already exists
+    domainids = conn.listDomainsID()
+    for domainid in domainids:
+        domainobj = conn.lookupByID(domainid)
+        domain = "%s" % domainobj.name()
+        if domain == 'deploy':
+            logit("Deploy vm alreasy exists.", logtype="INFO")
+            return 0
+
+
+    # Create the libvirt command(we are using virt-install as it allows initrd injection)
+    virt_install_command = "virt-install --connect qemu:///system --nographics --noautoconsole --wait -1 " \
+                           "--name %s " \
+                           "--ram %s " \
+                           "--disk %s " \
+                           "--location %s " \
+                           "--initrd-inject %s " \
+                           "--extra-args %s " \
+                           "--os-type %s " \
+                           "--os-variant %s " \
+                           "--virt-type %s " \
+        % (
+            getConfigItem(curconfig, 'deploy', 'virt_install_name'),
+            getConfigItem(curconfig, 'deploy', 'virt_install_ram'),
+            getConfigItem(curconfig, 'deploy', 'virt_install_disk'),
+            getConfigItem(curconfig, 'deploy', 'virt_install_location'),
+            getConfigItem(curconfig, 'deploy', 'virt_install_initrd-inject'),
+            getConfigItem(curconfig, 'deploy', 'virt_install_extra-args'),
+            getConfigItem(curconfig, 'deploy', 'virt_install_os-type'),
+            getConfigItem(curconfig, 'deploy', 'virt_install_os-variant'),
+            getConfigItem(curconfig, 'deploy', 'virt_install_virt-type')
+        )
+    for network in getConfigItem(curconfig, 'deploy', 'virt_install_networks').split(" "):
+        virt_install_command = virt_install_command + "--network %s " % network
+
+    # Build the server over the networking using virt-install
+    logit("Running virt-install to create the deploy device.", logtype="ACTION")
+    logit("Run 'clear; virsh console deploy' in a separate window to watch.")
+    try:
+        subprocess.check_call(virt_install_command, shell=True)
+    except subprocess.CalledProcessError:
+        logit("virt-install command errored out. Exiting program", logtype="ERROR")
+        sys.exit(1)
+    else:
+        logit("virt-install completed without issue.", logtype="SUCCESS")
+
+
+#########################
+# Destroy the Deploy VM
+#########################
+def destroyDeployVM(curconfig):
+
+    # Check if deploy device exists
+    conn = libvirtConnect()   
+
+    # Just log and return if it already exists
+    domainids = conn.listDomainsID()
+    for domainid in domainids:
+        domainobj = conn.lookupByID(domainid)
+        domain = "%s" % domainobj.name()
+        if domain == 'deploy':
+            logit("Deploy VM Found. Destroying", logtype="ACTION")
+            domainobj.destroy()
+            domainobj.undefine()
+            return 0
 
 
 
@@ -227,6 +279,9 @@ def create_func(curconfig):
 # Destroy the lab environment
 ###############################
 def destroy_func(curconfig):
+
+    # Destroy the deploy device
+    destroyDeployVM(curconfig)
 
     # Clean Networking
     destroyNetworks()

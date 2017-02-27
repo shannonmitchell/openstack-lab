@@ -7,18 +7,21 @@
 
 virt-install \
 --connect qemu:///system \
---name ubuntu \
+--name deploy \
 --ram 512 \
 --disk pool=storage,size=8,bus=virtio,sparse=false \
---network network=management,model=virtio \
+--network network=management,model=e1000 \
+--network network=overlay,model=e1000 \
+--network network=storage,model=e1000 \
+--network network=management,model=e1000 \
+--network network=overlay,model=e1000 \
+--network network=storage,model=e1000 \
 --location=http://us.archive.ubuntu.com/ubuntu/dists/xenial/main/installer-amd64/ \
 --initrd-inject=./files/preseed.cfg \
 --extra-args="console=tty0 console=ttyS0,115200n8 serial locale=en_GB.UTF-8 console-setup/ask_detect=false keyboard-configuration/layoutcode=hu file=file:/preseed.cfg quiet" \
 --os-type=linux \
 --os-variant=ubuntu16.04 \
 --virt-type kvm \
---nographics \
---noreboot
+--nographics
 
-#--video=vga \
-#--extra-args="console=tty0 console=ttyS0,115200n8 serial ip=10.10.0.3:10.10.10.1:255.255.0.0:deploy.localhost:none locale=en_GB.UTF-8 console-setup/ask_detect=false keyboard-configuration/layoutcode=hu file=file:/preseed.cfg quiet" \
+virt-install --connect qemu:///system --name deploy --ram 512 --disk pool=storage,size=8,bus=virtio,sparse=false --network network=management,model=e1000 --network network=overlay,model=e1000 --network network=storage,model=e1000 --network network=management,model=e1000 --network network=overlay,model=e1000 --network network=storage,model=e1000 --location=http://us.archive.ubuntu.com/ubuntu/dists/xenial/main/installer-amd64/ --initrd-inject=./files/preseed.cfg --extra-args="console=tty0 console=ttyS0,115200n8 serial locale=en_GB.UTF-8 console-setup/ask_detect=false keyboard-configuration/layoutcode=hu file=file:/preseed.cfg quiet" --os-type=linux --os-variant=ubuntu16.04 --virt-type kvm --nographics
