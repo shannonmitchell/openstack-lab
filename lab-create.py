@@ -65,7 +65,7 @@ def assignIPs(devicename):
     retvaljson = ""
 
     if os.path.isfile('./manage-ips.py'):
-        logit("Running ./manage-ips.py", "request-ips --name %s --networks management,overlay,storage" % devicename)
+        logit("Running ./manage-ips.py request-ips --name %s --networks management,overlay,storage" % devicename)
         try:
             retvaljson = subprocess.check_output(['./manage-ips.py', 'request-ips', '--name', devicename, '--networks', 'management,overlay,storage'])
         except subprocess.CalledProcessError:
@@ -263,12 +263,18 @@ def createDeployVM(curconfig):
     management_gw = getConfigItem(curconfig, 'networks', 'management_gw')
     management_netmask = getConfigItem(curconfig, 'networks', 'management_netmask')
     management_network = getConfigItem(curconfig, 'networks', 'management_network')
+    vm_gecos = getConfigItem(curconfig, 'default', 'vm_gecos')
+    vm_username = getConfigItem(curconfig, 'default', 'vm_username')
+    vm_password = getConfigItem(curconfig, 'default', 'vm_password')
     ipinfo = assignIPs('deploy')
     templateinfo = {
         'ipaddress': ipinfo['management'],
         'netmask': management_netmask,
         'gateway': management_gw,
-        'nameservers': management_gw
+        'nameservers': management_gw,
+        'vm_password': vm_password,
+        'vm_username': vm_username,
+        'vm_gecos': vm_gecos
     }
     finalpreseed = jinja2.Environment(loader=jinja2.FileSystemLoader('./templates/')).get_template('preseed.cfg.j2').render(templateinfo)
     prfile = open('./files/preseed.cfg', 'w')
@@ -310,7 +316,9 @@ def createDeployVM(curconfig):
             getConfigItem(curconfig, 'deploy', 'virt_install_os-variant'),
             getConfigItem(curconfig, 'deploy', 'virt_install_virt-type')
         )
-    for network in getConfigItem(curconfig, 'deploy', 'virt_install_networks').split(" "):
+    network_string = getConfigItem(curconfig, 'deploy', 'virt_install_networks')
+    network_string = network_string.strip('"')
+    for network in network_string.split(" "):
         virt_install_command = virt_install_command + "--network %s " % network
 
     # Build the server over the networking using virt-install
@@ -374,7 +382,7 @@ def create_func(curconfig):
     createDeployVM(curconfig)
 
     # Copy the root public key over
-    deployRootKey('deploy', 'ubuntu', 'ubuntu')
+    deployRootKey('deploy', 'openstack', 'openstack')
 
     
 

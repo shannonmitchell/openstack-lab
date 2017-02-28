@@ -2,10 +2,12 @@
 d-i netcfg/get_hostname string deploy
 d-i netcfg/get_domain string openstack-lab
 
-# Create new user
-d-i passwd/user-fullname string Ubuntu User
-d-i passwd/username string ubuntu
-d-i passwd/user-password-crypted password $1$1AniiGAw$ZsUcBK840ZrkmoVIvTneP1
+# Create new user user/pass ubuntu
+d-i passwd/user-fullname string {{ vm_gecos }}
+d-i passwd/username string {{ vm_username }}
+#d-i passwd/user-password-crypted password {{ vm_password }}
+d-i passwd/user-password password {{ vm_password }}
+d-i passwd/user-password-again password {{ vm_password }}
 
 # Don't encrypt the home directory
 d-i user-setup/encrypt-home boolean false
@@ -90,3 +92,7 @@ d-i base-installer/kernel/altmeta string lts-raring
 
 # Make sure we can use virsh-console by adding the proper kernel arguments
 d-i debian-installer/add-kernel-opts string console=tty0 console=ttyS0,115200n8
+
+# Make sure the defined vm_username can sudo up without a password
+d-i preseed/late_command string echo '{{ vm_username }} ALL=(ALL:ALL) NOPASSWD:ALL' > /target/etc/sudoers.d/{{ vm_username }}; chmod 440 /target/etc/sudoers.d/{{ vm_username }} ;
+
