@@ -3,8 +3,11 @@
 import os
 import sys
 import uuid
+import json
+import jinja2
 import libvirt
 import argparse
+import ipaddress
 import subprocess
 import configparser
 
@@ -40,6 +43,26 @@ def runScript(script, script_args=''):
     else:
        logit("%s does not exist" % script, logtype="ERROR");
 
+def assignIPs(devicename):
+
+    retvaljson = ""
+
+    if os.path.isfile('./manage-ips.py'):
+        logit("Running ./manage-ips.py", "request-ips --name %s --networks management,overlay,storage" % devicename)
+        try:
+            retvaljson = subprocess.check_output(['./manage-ips.py', 'request-ips', '--name', devicename, '--networks', 'management,overlay,storage'])
+        except subprocess.CalledProcessError:
+            logit("Command './manage-ips.py request-ips --name %s --networks management,overlay,storage' errored out. Exiting program" % devicename, logtype="ERROR")
+            sys.exit(1)
+        else:
+            logit("Command './manage-ips.py request-ips --name %s --networks management,overlay,storage' completed without issue" % devicename, logtype="SUCCESS")
+    else:
+       logit("%s does not exist" % script, logtype="ERROR");
+
+    retvaldict = json.loads(retvaljson)
+    return retvaldict
+
+
 def libvirtConnect():
     conn = libvirt.open('qemu:///system')
     if conn == None:
@@ -47,6 +70,24 @@ def libvirtConnect():
         sys.exit(1)
 
     return conn
+
+def manageNetworks(curconfig):
+
+    management_gw = getConfigItem(curconfig, 'networks', 'management_gw')
+    management_netmask = getConfigItem(curconfig, 'networks', 'management_netmask')
+    management_network = getConfigItem(curconfig, 'networks', 'management_network')
+    runScript('./manage-ips.py', 'allocate-network --name management --cidr %s/%s --gateway %s' % (management_network, management_netmask, management_gw));
+
+    overlay_gw = getConfigItem(curconfig, 'networks', 'overlay_gw')
+    overlay_netmask = getConfigItem(curconfig, 'networks', 'overlay_netmask')
+    overlay_network = getConfigItem(curconfig, 'networks', 'overlay_network')
+    runScript('./manage-ips.py', 'allocate-network --name overlay --cidr %s/%s --gateway %s' % (overlay_network, overlay_netmask, overlay_gw));
+
+    storage_gw = getConfigItem(curconfig, 'networks', 'storage_gw')
+    storage_netmask = getConfigItem(curconfig, 'networks', 'storage_netmask')
+    storage_network = getConfigItem(curconfig, 'networks', 'storage_network')
+    runScript('./manage-ips.py', 'allocate-network --name storage --cidr %s/%s --gateway %s' % (storage_network, storage_netmask, storage_gw));
+    
 
 def configureNetworks(curconfig):
     conn = libvirtConnect()   
@@ -68,6 +109,7 @@ def configureNetworks(curconfig):
             found_management = 1;
         if network == 'overlay':
             found_overlay = 1;
+
 
     # Create a management network with external access
     management_gw = getConfigItem(curconfig, 'networks', 'management_gw')
@@ -180,16 +222,33 @@ def createDeployVM(curconfig):
     # Check if deploy device exists
     conn = libvirtConnect()   
 
+
+    # Create a preseed from a template
+    management_gw = getConfigItem(curconfig, 'networks', 'management_gw')
+    management_netmask = getConfigItem(curconfig, 'networks', 'management_netmask')
+    management_network = getConfigItem(curconfig, 'networks', 'management_network')
+    ipinfo = assignIPs('deploy')
+    templateinfo = {
+        'ipaddress': ipinfo['management'],
+        'netmask': management_netmask,
+        'gateway': management_gw,
+        'nameservers': management_gw
+    }
+    finalpreseed = jinja2.Environment(loader=jinja2.FileSystemLoader('./templates/')).get_template('preseed.cfg.j2').render(templateinfo)
+    prfile = open('./files/preseed.cfg', 'w')
+    prfile.write(finalpreseed)
+    prfile.close()
+
     # Just log and return if it already exists
     domainids = conn.listDomainsID()
     for domainid in domainids:
         domainobj = conn.lookupByID(domainid)
         domain = "%s" % domainobj.name()
         if domain == 'deploy':
-            logit("Deploy vm alreasy exists.", logtype="INFO")
+            logit("Deploy vm already exists.", logtype="INFO")
             return 0
 
-
+    
     # Create the libvirt command(we are using virt-install as it allows initrd injection)
     virt_install_command = "virt-install --connect qemu:///system --nographics --noautoconsole --wait -1 " \
                            "--name %s " \
@@ -263,6 +322,9 @@ def create_func(curconfig):
     # Run script to set up storage
     image_disk = getConfigItem(curconfig, 'lab-host', 'lab-disk')
     runScript("%s/create_image_disk.sh" % scripts_dir, image_disk)
+
+    # Add networks to managment db
+    manageNetworks(curconfig)
 
     # Set up Networing
     configureNetworks(curconfig)

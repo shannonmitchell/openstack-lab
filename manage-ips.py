@@ -50,7 +50,7 @@ def allocateNetwork(data_path, netname, netcidr, gateway):
 
     # Check that a network by that name doesn't already exist.
     if os.path.exists("%s/networks/%s.json" % (data_path, netname)):
-        logit("Network by the name of %s is already defined" % netname, logtype="ERROR")
+        logit("Network by the name of %s is already defined" % netname, logtype="INFO")
         return 1
 
     # Convert data to json and save.
@@ -58,7 +58,7 @@ def allocateNetwork(data_path, netname, netcidr, gateway):
         newnetwork = ipaddress.ip_network(unicode(netcidr))
         savenet = {}
         savenet['network_name'] = netname
-        savenet['network_cidr'] = netcidr
+        savenet['network_cidr'] = str(newnetwork)
         savenet['network_broadcast'] = str(newnetwork[-1])
         savenet['reserved_ips'] = []
         savenet['reserved_ips'].append(str(newnetwork[0]))
@@ -89,7 +89,7 @@ def listNetworks(data_path, showmaps):
             json_data = rfile.read()
             data_dict = json.loads(json_data)
             rfile.close()
-            print "%-20s %-20s %-10s" % (data_dict['network_name'] + ':', 'cidr(' + data_dict['network_cidr'] + ')', 'gw(' + data_dict['network_gateway'] + ')')
+            print "%-20s %-20s %-10s" % (data_dict['network_name'] + ':', 'network(' + data_dict['network_cidr'] + ')', 'gw(' + data_dict['network_gateway'] + ')')
             if showmaps:
                 print
                 for mapping in data_dict['mappings']:
