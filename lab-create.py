@@ -7,11 +7,28 @@ import json
 import jinja2
 import libvirt
 import argparse
+import paramiko
 import ipaddress
 import subprocess
 import configparser
 
 # apt-get install python-configparsesr python-lvm2 python-libvirt
+
+def deployRootKey(curhost, curuser, curpass):
+
+    # Get the public root key
+    pubkey = open('/root/.ssh/id_rsa.pub', 'r')
+    pubkeytext = pubkey.read()
+    pubkey.close() 
+    
+    # Copy it over
+    client = paramiko.SSHClient()
+    client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+    client.connect(curhost, username=curuser, password=curpass)
+    client.exec_command('mkdir -p ~/.ssh/')
+    client.exec_command('echo "%s" > ~/.ssh/authorized_keys' % pubkeytext)
+    client.exec_command('chmod 644 ~/.ssh/authorized_keys')
+    client.exec_command('chmod 700 ~/.ssh/')
 
 def logit(log, logtype="INFO"):
     print "[%s]: %s" % (logtype, log)
@@ -213,6 +230,25 @@ def destroyNetworks():
             netobj.destroy()
             netobj.undefine()
 
+def updateHostsFile(curip, curhostname):
+    hostsfile = open('/etc/hosts', 'r')
+    hostfound = 0
+    for hostsline in hostsfile:
+        hostentry = "%s %s" % (curip, curhostname)
+        if hostentry in hostsline:
+            logit('%s alredy exists in /etc/hosts' % hostentry)
+            hostfound = 1
+    hostsfile.close()
+
+    hostsfile = open('/etc/hosts', 'a')
+    if hostfound != 1:
+        logit('writing "%s" to /etc/hosts' % hostentry, logtype="ACTION")
+        hostsfile.write(hostentry + "\n")
+    hostsfile.close()
+    
+
+  
+
 
 ########################
 # Create the deploy box
@@ -238,6 +274,9 @@ def createDeployVM(curconfig):
     prfile = open('./files/preseed.cfg', 'w')
     prfile.write(finalpreseed)
     prfile.close()
+
+    # Lets go ahead and add the management ip to the local /etc/hosts file
+    updateHostsFile(ipinfo['management'], 'deploy')
 
     # Just log and return if it already exists
     domainids = conn.listDomainsID()
@@ -286,6 +325,8 @@ def createDeployVM(curconfig):
         logit("virt-install completed without issue.", logtype="SUCCESS")
 
 
+
+
 #########################
 # Destroy the Deploy VM
 #########################
@@ -332,6 +373,8 @@ def create_func(curconfig):
     # Create the deploy device
     createDeployVM(curconfig)
 
+    # Copy the root public key over
+    deployRootKey('deploy', 'ubuntu', 'ubuntu')
 
     
 
