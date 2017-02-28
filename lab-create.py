@@ -314,7 +314,7 @@ def main():
     #############################
     # Get the configuration 
     #############################
-    config_loc = ['./lab-config.ini', './etc/lab-config.ini' , '/etc/lab-config.ini']
+    config_loc = ['./lab-config.ini', './etc/lab-config/lab-config.ini' , '/etc/lab-config/lab-config.ini']
     config_file = ''
     for cfg_loc in config_loc:
         if os.path.isfile(cfg_loc):
