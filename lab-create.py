@@ -14,6 +14,62 @@ import configparser
 
 # apt-get install python-configparsesr python-lvm2 python-libvirt
 
+def configGuestNetwork(curconfig, curhost, curuser, curpass):
+
+    # Create a interfaces file from a template
+    pxe_gw = getConfigItem(curconfig, 'networks', 'pxe_gw')
+    pxe_netmask = getConfigItem(curconfig, 'networks', 'pxe_netmask')
+    pxe_network = getConfigItem(curconfig, 'networks', 'pxe_network')
+
+    management_gw = getConfigItem(curconfig, 'networks', 'management_gw')
+    management_netmask = getConfigItem(curconfig, 'networks', 'management_netmask')
+    management_network = getConfigItem(curconfig, 'networks', 'management_network')
+    management_vlan = getConfigItem(curconfig, 'networks', 'management_vlan')
+
+    storage_gw = getConfigItem(curconfig, 'networks', 'storage_gw')
+    storage_netmask = getConfigItem(curconfig, 'networks', 'storage_netmask')
+    storage_network = getConfigItem(curconfig, 'networks', 'storage_network')
+    storage_vlan = getConfigItem(curconfig, 'networks', 'storage_vlan')
+
+    overlay_gw = getConfigItem(curconfig, 'networks', 'overlay_gw')
+    overlay_netmask = getConfigItem(curconfig, 'networks', 'overlay_netmask')
+    overlay_network = getConfigItem(curconfig, 'networks', 'overlay_network')
+    overlay_vlan = getConfigItem(curconfig, 'networks', 'overlay_vlan')
+
+    ipinfo = assignIPs('deploy')
+
+    templateinfo = {
+        'pxe_ipaddress': ipinfo['pxe'],
+        'pxe_netmask': pxe_netmask,
+        'pxe_gateway': pxe_gw,
+        'pxe_nameservers': pxe_gw,
+        'management_ipaddress': ipinfo['management'],
+        'management_netmask': management_netmask,
+        'management_gateway': management_gw,
+        'management_nameservers': management_gw,
+        'management_vlan': management_vlan,
+        'overlay_ipaddress': ipinfo['overlay'],
+        'overlay_netmask': overlay_netmask,
+        'overlay_gateway': overlay_gw,
+        'overlay_nameservers': overlay_gw,
+        'overlay_vlan': overlay_vlan,
+        'storage_ipaddress': ipinfo['storage'],
+        'storage_netmask': storage_netmask,
+        'storage_gateway': storage_gw,
+        'storage_nameservers': storage_gw,
+        'storage_vlan': storage_vlan,
+    }
+    finalinterfaces = jinja2.Environment(loader=jinja2.FileSystemLoader('./templates/')).get_template('interfaces.j2').render(templateinfo)
+
+    # Copy it over to its new home
+    client = paramiko.SSHClient()
+    client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+    client.connect(curhost, username=curuser, password=curpass)
+    stdin,stdout,stderr = client.exec_command('echo "%s" > /tmp/interfaces_test' % finalinterfaces, get_pty=True)
+    stdin,stdout,stderr = client.exec_command('sudo cp /tmp/interfaces_test /etc/network/interfaces', get_pty=True)
+    stdin,stdout,stderr = client.exec_command('sudo reboot', get_pty=True)
+
+
 def deployRootKey(curhost, curuser, curpass):
 
     # Get the public root key
@@ -65,14 +121,14 @@ def assignIPs(devicename):
     retvaljson = ""
 
     if os.path.isfile('./manage-ips.py'):
-        logit("Running ./manage-ips.py request-ips --name %s --networks management,overlay,storage" % devicename)
+        logit("Running ./manage-ips.py request-ips --name %s --networks pxe,management,overlay,storage" % devicename)
         try:
-            retvaljson = subprocess.check_output(['./manage-ips.py', 'request-ips', '--name', devicename, '--networks', 'management,overlay,storage'])
+            retvaljson = subprocess.check_output(['./manage-ips.py', 'request-ips', '--name', devicename, '--networks', 'pxe,management,overlay,storage'])
         except subprocess.CalledProcessError:
-            logit("Command './manage-ips.py request-ips --name %s --networks management,overlay,storage' errored out. Exiting program" % devicename, logtype="ERROR")
+            logit("Command './manage-ips.py request-ips --name %s --networks pxe,management,overlay,storage' errored out. Exiting program" % devicename, logtype="ERROR")
             sys.exit(1)
         else:
-            logit("Command './manage-ips.py request-ips --name %s --networks management,overlay,storage' completed without issue" % devicename, logtype="SUCCESS")
+            logit("Command './manage-ips.py request-ips --name %s --networks pxe,management,overlay,storage' completed without issue" % devicename, logtype="SUCCESS")
     else:
        logit("%s does not exist" % script, logtype="ERROR");
 
@@ -90,9 +146,15 @@ def libvirtConnect():
 
 def manageNetworks(curconfig):
 
+    pxe_gw = getConfigItem(curconfig, 'networks', 'pxe_gw')
+    pxe_netmask = getConfigItem(curconfig, 'networks', 'pxe_netmask')
+    pxe_network = getConfigItem(curconfig, 'networks', 'pxe_network')
+    runScript('./manage-ips.py', 'allocate-network --name pxe --cidr %s/%s --gateway %s' % (pxe_network, pxe_netmask, pxe_gw));
+
     management_gw = getConfigItem(curconfig, 'networks', 'management_gw')
     management_netmask = getConfigItem(curconfig, 'networks', 'management_netmask')
     management_network = getConfigItem(curconfig, 'networks', 'management_network')
+    management_vlan = getConfigItem(curconfig, 'networks', 'management_vlan')
     runScript('./manage-ips.py', 'allocate-network --name management --cidr %s/%s --gateway %s' % (management_network, management_netmask, management_gw));
 
     overlay_gw = getConfigItem(curconfig, 'networks', 'overlay_gw')
@@ -109,6 +171,7 @@ def manageNetworks(curconfig):
 def configureNetworks(curconfig):
     conn = libvirtConnect()   
 
+    found_pxe = 0
     found_storage = 0
     found_overlay = 0
     found_management = 0
@@ -120,6 +183,8 @@ def configureNetworks(curconfig):
             netobj = conn.networkLookupByName('default')
             netobj.destroy()
             netobj.undefine()
+        if network == 'pxe':
+            found_storage = 1;
         if network == 'storage':
             found_storage = 1;
         if network == 'management':
@@ -127,6 +192,35 @@ def configureNetworks(curconfig):
         if network == 'overlay':
             found_overlay = 1;
 
+    # Create a pxe network with external access
+    pxe_gw = getConfigItem(curconfig, 'networks', 'pxe_gw')
+    pxe_netmask = getConfigItem(curconfig, 'networks', 'pxe_netmask')
+    if found_pxe == 0:
+        logit("Creating pxe network", logtype="ACTION")
+        pxe_net_xml = """<network>
+  <name>pxe</name>
+  <uuid>%s</uuid>
+  <forward mode='nat'/>
+  <bridge name='virbr0' stp='on' delay='0'/>
+  <ip address='%s' netmask='%s'>
+  </ip>
+</network> """ % (uuid.uuid4(), pxe_gw, pxe_netmask)
+
+        # Define it in libvirt
+        netobj = conn.networkDefineXML(pxe_net_xml)
+        if netobj == None:
+            logit("Failed to create pxe network", logtype="ERROR")
+            sys.exit(1)
+
+        # Set it to autostart
+        netobj.setAutostart(1)
+        
+        # Make it active
+        isactive = netobj.isActive()
+        if isactive == 1:
+            logit("Network pxe is up and active", logtype="SUCCESS")
+        else:
+            netobj.create()
 
     # Create a management network with external access
     management_gw = getConfigItem(curconfig, 'networks', 'management_gw')
@@ -136,8 +230,7 @@ def configureNetworks(curconfig):
         management_net_xml = """<network>
   <name>management</name>
   <uuid>%s</uuid>
-  <forward mode='nat'/>
-  <bridge name='virbr0' stp='on' delay='0'/>
+  <bridge name='virbr1' stp='on' delay='0'/>
   <ip address='%s' netmask='%s'>
   </ip>
 </network> """ % (uuid.uuid4(), management_gw, management_netmask)
@@ -166,7 +259,7 @@ def configureNetworks(curconfig):
         overlay_net_xml = """<network>
   <name>overlay</name>
   <uuid>%s</uuid>
-  <bridge name='virbr1' stp='on' delay='0'/>
+  <bridge name='virbr2' stp='on' delay='0'/>
   <ip address='%s' netmask='%s'>
   </ip>
 </network> """ % (uuid.uuid4(), overlay_gw, overlay_netmask)
@@ -195,7 +288,7 @@ def configureNetworks(curconfig):
         storage_net_xml = """<network>
   <name>storage</name>
   <uuid>%s</uuid>
-  <bridge name='virbr2' stp='on' delay='0'/>
+  <bridge name='virbr3' stp='on' delay='0'/>
   <ip address='%s' netmask='%s'>
   </ip>
 </network> """ % (uuid.uuid4(), storage_gw, storage_netmask)
@@ -224,7 +317,7 @@ def destroyNetworks():
     # Remove the default network if it exists
     networks = conn.listNetworks()
     for network in networks:
-        if network in ['default', 'storage', 'management', 'overlay']:
+        if network in ['default', 'pxe', 'storage', 'management', 'overlay']:
             logit("Deleting %s network" % network, logtype="ACTION")
             netobj = conn.networkLookupByName(network)
             netobj.destroy()
@@ -260,18 +353,24 @@ def createDeployVM(curconfig):
 
 
     # Create a preseed from a template
+    pxe_gw = getConfigItem(curconfig, 'networks', 'pxe_gw')
+    pxe_netmask = getConfigItem(curconfig, 'networks', 'pxe_netmask')
+    pxe_network = getConfigItem(curconfig, 'networks', 'pxe_network')
+
     management_gw = getConfigItem(curconfig, 'networks', 'management_gw')
     management_netmask = getConfigItem(curconfig, 'networks', 'management_netmask')
     management_network = getConfigItem(curconfig, 'networks', 'management_network')
+
     vm_gecos = getConfigItem(curconfig, 'default', 'vm_gecos')
     vm_username = getConfigItem(curconfig, 'default', 'vm_username')
     vm_password = getConfigItem(curconfig, 'default', 'vm_password')
+
     ipinfo = assignIPs('deploy')
     templateinfo = {
-        'ipaddress': ipinfo['management'],
-        'netmask': management_netmask,
-        'gateway': management_gw,
-        'nameservers': management_gw,
+        'ipaddress': ipinfo['pxe'],
+        'netmask': pxe_netmask,
+        'gateway': pxe_gw,
+        'nameservers': pxe_gw,
         'vm_password': vm_password,
         'vm_username': vm_username,
         'vm_gecos': vm_gecos
@@ -281,8 +380,8 @@ def createDeployVM(curconfig):
     prfile.write(finalpreseed)
     prfile.close()
 
-    # Lets go ahead and add the management ip to the local /etc/hosts file
-    updateHostsFile(ipinfo['management'], 'deploy')
+    # Lets go ahead and add the pxe ip to the local /etc/hosts file
+    updateHostsFile(ipinfo['pxe'], 'deploy')
 
     # Just log and return if it already exists
     domainids = conn.listDomainsID()
@@ -383,6 +482,9 @@ def create_func(curconfig):
 
     # Copy the root public key over
     deployRootKey('deploy', 'openstack', 'openstack')
+
+    # Do the base network config in the deploy VM
+    configGuestNetwork(curconfig, 'deploy', 'openstack', 'openstack')
 
     
 

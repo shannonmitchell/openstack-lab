@@ -52,7 +52,7 @@ d-i pkgsel/update-policy select unattended-upgrades
 tasksel tasksel/first multiselect openssh-server
 
 # Install acpid
-d-i pkgsel/include string acpid
+d-i pkgsel/include string acpid vim vlan ifenslave ifenslave-2.6 bridge-utils lsof lvm2 ntp ntpdate openssh-server sudo tcpdump debootstrap
 
 # Install GRUB2
 d-i grub-installer/only_debian boolean true
@@ -94,5 +94,5 @@ d-i base-installer/kernel/altmeta string lts-raring
 d-i debian-installer/add-kernel-opts string console=tty0 console=ttyS0,115200n8
 
 # Make sure the defined vm_username can sudo up without a password
-d-i preseed/late_command string echo '{{ vm_username }} ALL=(ALL:ALL) NOPASSWD:ALL' > /target/etc/sudoers.d/{{ vm_username }}; chmod 440 /target/etc/sudoers.d/{{ vm_username }} ;
+d-i preseed/late_command string echo '{{ vm_username }} ALL=(ALL:ALL) NOPASSWD:ALL' > /target/etc/sudoers.d/{{ vm_username }}; chmod 440 /target/etc/sudoers.d/{{ vm_username }} ; echo 'bonding' >> /target/etc/modules ; echo '8021q' >> /target/etc/modules;
 

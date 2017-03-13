@@ -1,0 +1,162 @@
+# This file describes the network interfaces available on your system
+# and how to activate them. For more information, see interfaces(5).
+
+source /etc/network/interfaces.d/*
+
+# The loopback network interface
+auto lo
+iface lo inet loopback
+
+######################################
+# PXE Network Configuration
+######################################
+auto ens2
+iface ens2 inet static
+    address {{ pxe_ipaddress }}
+    netmask {{ pxe_netmask }}
+    gateway {{ pxe_gateway }}
+    dns-nameservers {{ pxe_nameservers }}
+
+
+######################################
+# Management Network Configuration
+######################################
+
+# The network interfaces for bond0 connected to the management network
+auto ens3
+iface ens3 inet manual
+    bond-master bond0
+
+auto ens6
+iface ens6 inet manual
+    bond-master bond0
+
+
+# Configure bond0 with the management network physical devices
+auto bond0
+iface bond0 inet manual
+    bond-slaves ens3 ens6
+    bond-mode active-backup
+    bond-miimon 100
+
+
+# Container management VLAN interface
+iface bond0.{{ management_vlan }} inet manual
+    vlan-raw-device bond0
+
+
+# Management bridge
+auto br-mgmt
+iface br-mgmt inet static
+    bridge_stp off
+    bridge_waitport 0
+    bridge_fd 0
+    # just attaching this to bond0 for the lab as this is all internal.
+    #bridge_ports  bond0.{{ management_vlan }}
+    bridge_ports  bond0
+    address {{ management_ipaddress }}
+    netmask {{ management_netmask }}
+    gateway {{ management_gateway }}
+    dns-nameservers {{ management_nameservers }}
+
+
+
+######################################
+# Overlay Network Configuration
+######################################
+
+# The network interfaces for bond0 connected to the management network
+auto ens4
+iface ens4 inet manual
+    bond-master bond1
+
+auto ens7
+iface ens7 inet manual
+    bond-master bond1
+
+
+# Configure bond0 with the management network physical devices
+auto bond1
+iface bond1 inet manual
+    bond-slaves ens4 ens7
+    bond-mode active-backup
+    bond-miimon 100
+
+
+# Container management VLAN interface
+iface bond1.{{ overlay_vlan }} inet manual
+    vlan-raw-device bond1
+
+
+# OpenStack Networking VXLAN (tunnel/overlay) bridge(attached to vlan interface)
+auto br-vxlan
+iface br-vxlan inet static
+    bridge_stp off
+    bridge_waitport 0
+    bridge_fd 0
+    bridge_ports  bond0.{{ overlay_vlan }}
+    address {{ overlay_ipaddress }}
+    netmask {{ overlay_netmask }}
+    gateway {{ overlay_gateway }}
+    dns-nameservers {{ overlay_nameservers }}
+
+
+# OpenStack Networking VLAN bridge(attachted directly to bond1 for vlan and flat networks)
+auto br-vlan
+iface br-vlan inet manual
+    bridge_stp off
+    bridge_waitport 0
+    bridge_fd 0
+    # Create veth pair, don't bomb if already exists
+    pre-up ip link add br-vlan-veth type veth peer name br-vlan-flat || true
+    # Set both ends UP
+    pre-up ip link set br-vlan-veth up
+    pre-up ip link set br-vlan-flat up
+    # Delete veth pair on DOWN
+    post-down ip link del br-vlan-veth || true
+    # Bridge port references untagged interface
+    bridge_ports bond1 br-vlan-veth
+
+
+
+######################################
+# Storage Network Configuration
+######################################
+
+# The network interfaces for bond0 connected to the management network
+auto ens5
+iface ens5 inet manual
+    bond-master bond2
+
+auto ens8
+iface ens8 inet manual
+    bond-master bond2
+
+
+# Configure bond0 with the management network physical devices
+auto bond2
+iface bond2 inet manual
+    bond-slaves ens5 ens8
+    bond-mode active-backup
+    bond-miimon 100
+
+
+# Container management VLAN interface
+iface bond2.{{ storage_vlan }} inet manual
+    vlan-raw-device bond2
+
+
+
+# Storage bridge (optional)
+auto br-storage
+iface br-storage inet static
+    bridge_stp off
+    bridge_waitport 0
+    bridge_fd 0
+    # Bridge port reference tagged interface
+    bridge_ports bond2.{{ storage_vlan }}
+    address {{ storage_ipaddress }}
+    netmask {{ storage_netmask }}
+    gateway {{ storage_gateway }}
+    dns-nameservers {{ storage_nameservers }}
+
