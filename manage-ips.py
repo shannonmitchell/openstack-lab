@@ -3,6 +3,7 @@
 import os
 import sys
 import json
+import yaml
 import argparse
 import ipaddress
 import configparser
@@ -204,6 +205,41 @@ def addMapping(data_path, devname, networkname, curip):
     return 0
 
 
+def dumpMappings(data_path, outputtype):
+
+    # As we will probably be accessing these via hostname in ansible scripts, the 
+    # data will look something like:
+    # username => network1 => ip1
+    #             network2 => ip2
+    retval = {}
+
+    net_loc = "%s/networks/" % data_path
+    for curfile in os.listdir(net_loc):
+        if curfile.endswith('.json'):
+
+            rfile = open("%s/%s" % (net_loc, curfile), 'r')
+            json_data = rfile.read()
+            data_dict = json.loads(json_data)
+            rfile.close()
+
+            curnetwork = data_dict['network_name']
+
+            # Check to see if a mapping exists and add to return value
+            for mapping in data_dict['mappings']:
+                if mapping not in retval:
+                    retval[mapping] = {}
+                if curnetwork not in retval[mapping]:
+                    retval[mapping][curnetwork] = {}
+                retval[mapping][curnetwork]['ip'] = data_dict['mappings'][mapping]
+
+
+    # Print the results in json format 
+    #print json.dumps(retval)
+
+    mappings = {}
+    mappings['ipmaps'] = retval
+    return yaml.safe_dump(mappings)
+
 def main():
 
     ######################
@@ -237,6 +273,13 @@ def main():
     parser_addmappings.add_argument('--network', required=True, help='Name of network mapping belongs to')
     parser_addmappings.add_argument('--ip', required=True, help='Ip address to map')
 
+    parser_dumpmappings = subparsers.add_parser('dump-mappings', help='Dump to given format for deployment use.')
+    parser_dumpmappings.set_defaults(func='dump-mappings')
+    parser_dumpmappings.add_argument('--type', required=False, default='yaml', help='Output format.  Currently only supports yaml for ansible')
+
+    parser_genosafiles = subparsers.add_parser('gen-osa-files', help='Generate files specifically for OSA')
+    parser_genosafiles.set_defaults(func='gen-osa-files')
+    parser_genosafiles.add_argument('--type', required=False, default='compute', help='Output format.  Currently only supports the compute yaml')
 
     args = parser.parse_args()
 
@@ -296,6 +339,13 @@ def main():
     #########################
     if args.func == 'add-mappings':
         addMapping(data_path, args.name, args.network, args.ip)
+
+    #######################################
+    # Dump mappings to use for deployments
+    #######################################
+    if args.func == 'dump-mappings':
+        mappings = dumpMappings(data_path, args.type)
+        print mappings
 
 
 if __name__ == '__main__':
