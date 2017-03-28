@@ -156,6 +156,54 @@ def requestIPs(data_path, devname, networks):
     return 0
 
 
+
+def addMapping(data_path, devname, networkname, curip):
+
+    retval = {}
+
+    net_loc = "%s/networks/" % data_path
+    for curfile in os.listdir(net_loc):
+        if curfile.endswith('.json'):
+            rfile = open("%s/%s" % (net_loc, curfile), 'r')
+            json_data = rfile.read()
+            data_dict = json.loads(json_data)
+            rfile.close()
+            if data_dict['network_name'] == networkname:
+
+                # Check to see if a mapping exists and add to return value
+                preassigned = 0
+                for mapping in data_dict['mappings']:
+                    if mapping == devname:
+                        retval[data_dict['network_name']] = data_dict['mappings'][mapping]
+                        preassigned = 1
+                        break
+
+                # If already assigned skip 
+                if preassigned == 1:
+                    continue
+
+                # Nothing was found.  Get a list of used ip addresses.
+                used_ips = data_dict['reserved_ips'][:]
+                for mapping in data_dict['mappings']:
+                    used_ips.append(data_dict['mappings'][mapping])
+
+                # Make sure ip is not used then assign it
+                if str(curip) not in used_ips:
+                    print "setting up mapping"
+                    data_dict['mappings'][devname] = str(curip)
+                    retval[data_dict['network_name']] = str(curip)
+     
+                    # Save the changes
+                    saveNetwork(data_path, data_dict)
+ 
+                    break
+
+    # Print the results in json format 
+    print json.dumps(retval)
+
+    return 0
+
+
 def main():
 
     ######################
@@ -182,6 +230,12 @@ def main():
     parser_requestips.set_defaults(func='request-ips')
     parser_requestips.add_argument('--name', required=True, help="Name of the device requesing the ip addresses.");
     parser_requestips.add_argument('--networks', required=True, help="Comma separated list of networks to request ip addresess from. If already assigned, the same ip will be returned.");
+
+    parser_addmappings = subparsers.add_parser('add-mappings', help='Add an existing ip to defined networks')
+    parser_addmappings.set_defaults(func='add-mappings')
+    parser_addmappings.add_argument('--name', required=True, help='Name of the device for the ip mapping')
+    parser_addmappings.add_argument('--network', required=True, help='Name of network mapping belongs to')
+    parser_addmappings.add_argument('--ip', required=True, help='Ip address to map')
 
 
     args = parser.parse_args()
@@ -236,6 +290,12 @@ def main():
     ###############################
     if args.func == 'request-ips':
         requestIPs(data_path, args.name, args.networks)
+
+    #########################
+    # Add existing mappings
+    #########################
+    if args.func == 'add-mappings':
+        addMapping(data_path, args.name, args.network, args.ip)
 
 
 if __name__ == '__main__':
